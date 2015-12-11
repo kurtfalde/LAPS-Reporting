@@ -8,6 +8,7 @@ Microsoft Services - Kurt Falde
 $DCTOQUERY = "ADDC"
 cd C:\LAPS
 
+Import-Module ServerManager
 If ((Get-WindowsFeature -Name RSAT-AD-PowerShell).Installed -eq $false){
     write-host "This needs the AD Powershell commandlets to proceed please run Install-WindowsFeature -Name RSAT-AD_PowerShell"
     Exit
@@ -45,7 +46,7 @@ $xpathdata = @()
 #Parsing through the $xpathdata array to create the right text needed for the xpath filter
 $xpathguid = $null
 If ($xpathdata.Count -le 1) {
-    Write-host -ForegroundColor Cyan "Either a Single or No Xpath Filters created are you sure you tested LAPS UI and using ADUC at a minium on the DC you are testing?"
+    Write-host -ForegroundColor Cyan "Either a Single or No Xpath Filters created are you sure you tested LAPS UI and using ADUC at a minium on the DC you are testing? That or change the get-winevent line to a larger number of events"
     $xpathguid = "(Data='$xpathdata')" 
     }
 
@@ -93,9 +94,12 @@ wecutil rs "LAPS Audit Events"
 #FYI if you need to export Subscriptions to fix SIDS or anything in an environment 
 #use wecutil gs "%subscriptionname%" /f:xml >>"C:\Temp\%subscriptionname%.xml"
 
-#Creating Task Scheduler Item to restart parsing script on reboot of system.
-If ((Get-ScheduledTask -TaskName "LAPS Parsing Task") -ne $NULL) {
-    Unregister-ScheduledTask -TaskName "LAPS Parsing Task" -Confir:$false
-    schtasks.exe /create /tn "LAPS Parsing Task" /xml LAPSParsingTask.xml
-    }
-Else {schtasks.exe /create /tn "LAPS Parsing Task" /xml LAPSParsingTask.xml}
+#Creating Task Scheduler Item to restart LAPS parsing script on reboot of system.
+schtasks.exe /delete /tn "LAPS Parsing Task" /F
+schtasks.exe /create /tn "LAPS Parsing Task" /xml LAPSParsingTask.xml
+schtasks.exe /run /tn "LAPS Parsing Task"
+
+#Creating Task Scheduler Item to run LAPS query script on a daily basis.
+schtasks.exe /delete /tn "LAPS Query Task" /F
+schtasks.exe /create /tn "LAPS Query Task" /xml LAPSQueryTask.xml
+schtasks.exe /run /tn "LAPS Query Task"

@@ -38,6 +38,13 @@ Remove-Job LAPSWatcher -ErrorAction SilentlyContinue
 
 Import-Module .\EventLogWatcher.psm1
 
+#Verify Bookmark currently exists prior to setting as start point
+$TestStream = $null
+$ECName = (((Get-Content .\bookmark.stream)[1]) -split "'")[1]
+$ERId = (((Get-Content .\bookmark.stream)[1]) -split "'")[3]
+$TestStream = Get-WinEvent -LogName $ECName -FilterXPath "*[System[(EventRecordID=$ERID)]]"
+If ($TestStream -eq $null) {Remove-Item .\bookmark.stream}
+
 $BookmarkToStartFrom = Get-BookmarkToStartFrom
 
 # The type of events that you want to parse.. in most cases we are parsing the Forwarded Events log with a specific xpath query for the events we want.
@@ -68,8 +75,16 @@ $action = {
                 
                 #Adding Target Computer Object after resolving GUID to name
                 $ComputerGUID = ($EventRecordXML.SelectSingleNode("//*[@Name='ObjectName']")."#text") -replace "%", "" -replace "{", "" -replace "}", ""
-                $ComputerName = (get-adobject -id $ComputerGUID).Name
-                $EventObj | Add-Member noteproperty TargetComputer $ComputerName
+                          $ComputerName = $null
+                          Try
+                          {
+                          $ComputerName = (get-adobject -id $ComputerGUID).Name
+                          }
+                          Catch
+                          {
+                          $ComputerName = $ComputerGUID
+                          }
+               $EventObj | Add-Member noteproperty TargetComputer $ComputerName
                 
                           
            If ($Outfile -ne $Null)
